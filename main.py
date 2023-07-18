@@ -1,5 +1,5 @@
 # Author: Francisco Torres (deimoshall.dev)
-# Repository: https://github.com/DeimosHall/compy.git
+# Repository: https://github.com/DeimosHall/compy-cli.git
 # Description: script to compress videos using ffmpeg
 
 import subprocess
