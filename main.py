@@ -7,7 +7,7 @@ import sys
 
 # Check if ffmpeg is installed
 try:
-    subprocess.call('ffmpeg -version', shell=True)
+    subprocess.check_output(['ffmpeg', '-version'])
 except:
     print('ffmpeg is not installed. Please install ffmpeg and try again.')
     sys.exit()
