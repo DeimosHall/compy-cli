@@ -48,19 +48,36 @@ def compress_video(input_file, output_file):
     subprocess.call(command, shell=True)
 
 
+def get_video_duration(file) -> str:
+    duration = subprocess.check_output(
+        f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{file}"', shell=True).decode('utf-8')
+    # Format HH:MM:SS
+    duration = int(float(duration))
+    hours = duration // 3600
+    minutes = (duration % 3600) // 60
+    seconds = duration % 60
+    return f'{hours:02}:{minutes:02}:{seconds:02}'
+
+
 def compare_size(input_file, output_file):
     if delete_original_file == 'y':
         # Delete the original file and remove the compressed word from the output file if needed
         original_file = input_file
-        input_size = subprocess.check_output(
-            f'du -sh "{input_file}"', shell=True).split()[0].decode('utf-8')
-        output_size = subprocess.check_output(
-            f'du -sh "{output_file}"', shell=True).split()[0].decode('utf-8')
+        # input_size = subprocess.check_output(
+        #     f'du -sh "{input_file}"', shell=True).split()[0].decode('utf-8')
+        # output_size = subprocess.check_output(
+        #     f'du -sh "{output_file}"', shell=True).split()[0].decode('utf-8')
+        # Get the size in bytes
+        input_size = os.path.getsize(input_file)
+        output_size = os.path.getsize(output_file)
+        # Convert to MB
+        input_size = f'{input_size / 1024 / 1024:.2f}M'
+        output_size = f'{output_size / 1024 / 1024:.2f}M'
+        print(f'Original file size: {input_size}')
+        print(f'Compressed file size: {output_size}')
         input_size = float(input_size.replace('M', ''))
         output_size = float(output_size.replace('M', ''))
 
-        print(f'Original file size: {input_size}')
-        print(f'Compressed file size: {output_size}')
         print(f'{input_size} <= {output_size} = {input_size <= output_size}')
         if input_size <= output_size:
             print(
@@ -68,9 +85,8 @@ def compare_size(input_file, output_file):
             # Add not compressed label
             subprocess.call(f'mv "{input_file}" "{
                             input_file[::-1].split(".", 1)[1][::-1]} not compressed.mp4"', shell=True)
-            # # Add compressed failed label
-            subprocess.call(f'mv "{output_file}" "{
-                            original_file[::-1].split(".", 1)[1][::-1]} compressed failed.mp4"', shell=True)
+            # Delete output file
+            subprocess.call(f'rm "{output_file}"', shell=True)
         else:
             subprocess.call(f'rm "{input_file}"', shell=True)
             # if not output_file_provided:
@@ -113,7 +129,10 @@ else:
     if list_files == 'y':
         for index, file in enumerate(files):
             if is_video_file(file):
-                print(f'{index + 1}. {file}')
+                video_size = os.path.getsize(
+                    f'{input_source}/{file}') / 1024 / 1024
+                video_size = f'{video_size:.2f} MB'
+                print(f'{index + 1}. {video_size} {file}')
 
     continue_compression = input('Do you want to continue? (y/n): ')
     if continue_compression != 'y':
@@ -125,7 +144,8 @@ else:
             input_file = f'{input_source}/{file}'
             output_file = f'{
                 input_source}/{file[::-1].split(".", 1)[1][::-1]} compressed.mp4'
-            print(f'Compressing {file}')
+            print(f'Compressing {file}, duration: {
+                  get_video_duration(input_file)} seconds')
             compress_video(input_file, output_file)
             compare_size(input_file, output_file)
             print(f'Compressed {index + 1}/{len(files)}')
