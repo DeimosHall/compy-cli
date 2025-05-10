@@ -59,6 +59,11 @@ def get_video_duration(file) -> str:
     return f'{hours:02}:{minutes:02}:{seconds:02}'
 
 
+def clone_metadata(input_file, output_file):
+    command = f'exiftool -tagsFromFile "{input_file}" -extractEmbedded -all:all -FileModifyDate -overwrite_original "{output_file}"'
+    subprocess.call(command, shell=True)
+
+
 def compare_size(input_file, output_file):
     if delete_original_file == 'y':
         # Delete the original file and remove the compressed word from the output file if needed
@@ -103,6 +108,7 @@ def is_video_file(file) -> bool:
 
 if os.path.isfile(input_source):
     compress_video(input_file, output_file)
+    clone_metadata(input_file, output_file)
     compare_size(input_file, output_file)
 else:
     # Get all the files in the directory
@@ -147,6 +153,7 @@ else:
             print(f'Compressing {file}, duration: {
                   get_video_duration(input_file)} seconds')
             compress_video(input_file, output_file)
+            clone_metadata(input_file, output_file)
             compare_size(input_file, output_file)
             print(f'Compressed {index + 1}/{len(files)}')
 
