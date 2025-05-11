@@ -117,7 +117,7 @@ else:
     videos_size_mb = 0
 
     for index, file in enumerate(files):
-        if 'compressed' in file:
+        if 'compressed' in file or '.trashed' in file:
             continue
         if is_video_file(file):
             videos_to_compress += 1
@@ -126,6 +126,7 @@ else:
 
     # Remove compressed videos and non-video files from files
     files = [file for file in files if not 'compressed' in file]
+    files = [file for file in files if not '.trashed' in file]
     files = [file for file in files if is_video_file(file)]
 
     print(f'Videos to compress: {videos_to_compress}, Total size: {
