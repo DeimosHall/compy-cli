@@ -1,10 +1,11 @@
 # Design doc: compy-cli
 
-⬅️ [[compy-rs]]
-
 **Version:** 0.1.0
+
 **Status:** Draft
+
 **Language:** Rust
+
 **Core Dependency:** FFmpeg (System binary)
 
 ## 1. Overview
