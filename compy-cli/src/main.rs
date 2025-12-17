@@ -1,40 +1,44 @@
-use std::error::Error;
+use std::{error::Error, process};
 use std::path::PathBuf;
-use clap::{Parser, Subcommand};
+use clap::{Parser};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Optional name to operate on
+    /// Path to a single video or a directory
     input: Option<PathBuf>,
-
-    /// Sets a custom config file
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
-
-    /// Turn debugging information on
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    debug: u8,
-
-    #[command(subcommand)]
-    command: Option<Commands>,
+    
+    /// Delete original file only after successful compression
+    #[arg(short, long)]
+    delete: bool,
+    
+    /// List the files to be processed and exits without compressing
+    #[arg(short, long)]
+    list: bool
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    /// does testing things
-    Test {
-        /// lists test values
-        #[arg(short, long)]
-        list: bool,
-    },
+fn delete_original() {
+    println!("Deleting original file...");
+}
+
+fn list_files() {
+    println!("Listing compatible files...");
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     
-    let input = cli.input.expect("No input provided");
+    let input = match cli.input {
+        Some(input) => input,
+        None => {
+            eprintln!("No input provided");
+            process::exit(1);
+        }
+    };
     println!("Input: {:?}", input);
+    
+    cli.delete.then(|| { delete_original() });
+    cli.list.then(|| { list_files() });
     
     Ok(())
 }
