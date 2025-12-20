@@ -3,6 +3,8 @@ use std::path::{PathBuf};
 use clap::{Parser};
 use walkdir::WalkDir;
 
+use crate::scanner::{FileScanner, FileScannerConfig};
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -26,6 +28,8 @@ fn list_files() {
     println!("Listing compatible files...");
 }
 
+mod scanner;
+
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     
@@ -38,20 +42,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     println!("Input: {:?}", input);
     
-    let mut files: Vec<PathBuf> = vec![];
+    let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
+    let config = FileScannerConfig::new(input, white_list);
+    let mut file_scanner = FileScanner::new(config);
     
-    if input.exists() && input.is_file() {
-        files.push(input);
-    } else if input.exists() && input.is_dir() {
-        let directory: WalkDir = WalkDir::new(input.as_os_str());
-        for file in directory {
-            files.push(file?.into_path());
-        }
-    }
+    let assets = file_scanner.scan();
     
-    println!("Files list:");
-    for file in files {
-        println!("File: {:?}", file);
+    println!("Files:");
+    for asset in assets {
+        println!("Path: {:?}", asset.path());
     }
     
     cli.delete.then(|| { delete_original() });
