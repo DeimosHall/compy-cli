@@ -48,9 +48,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     let assets = file_scanner.scan();
     
-    println!("Files:");
-    for asset in assets {
-        println!("Path: {:?}", asset.path());
+    match assets {
+        Ok(assets) => {
+            println!("Files:");
+            for asset in assets {
+                println!("Path: {:?}", asset.path());
+            }
+        },
+        Err(e) => {
+            eprintln!("Operation failed: {}", e);
+            process::exit(1);
+        }
     }
     
     cli.delete.then(|| { delete_original() });

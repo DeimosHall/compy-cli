@@ -1,6 +1,6 @@
-use std::path::{PathBuf};
+use std::{error::Error, io, path::PathBuf};
 
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, Clone)]
 enum VideoStatus {
@@ -76,11 +76,19 @@ impl<'a> FileScanner<'a> {
         self.assets.push(asset);
     }
     
-    pub fn scan(&mut self) -> Vec<VideoFile> {
+    fn is_hidden(&mut self, entry: &DirEntry) -> bool {
+        entry.file_name()
+             .to_str()
+             .map(|s| s.starts_with("."))
+             .unwrap_or(false)
+    }
+    
+    pub fn scan(&mut self) -> Result<Vec<VideoFile>, Box<dyn Error>> {
         let input = &self.config.input;
         
         if !input.exists() {
-            return vec![]
+            let error = io::Error::new(io::ErrorKind::NotFound, "No such file or directory");
+            return Err(Box::new(error));
         }
         
         if input.is_file() {
@@ -88,13 +96,13 @@ impl<'a> FileScanner<'a> {
         } else if input.is_dir() {
             let directory: WalkDir = WalkDir::new(input.as_os_str());
             for entry in directory {
-                match entry {
-                    Ok(entry) => self.add_asset(entry.into_path()),
-                    Err(_) => eprintln!(""),
+                let entry = entry?;
+                if !self.is_hidden(&entry) {
+                    self.add_asset(entry.into_path());
                 }
             }
         }
         
-        self.assets.clone()
+        Ok(self.assets.clone())
     }
 }
