@@ -1,8 +1,9 @@
+use std::process::ExitCode;
 use std::{error::Error, process};
 use std::path::{PathBuf};
 use clap::{Parser};
 
-use crate::scanner::{FileScanner, FileScannerConfig};
+use crate::scanner::{FileScanner, FileScannerConfig, VideoFile};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -23,8 +24,11 @@ fn delete_original() {
     println!("Deleting original file...");
 }
 
-fn list_files() {
-    println!("Listing compatible files...");
+fn list_files(assets: &Vec<VideoFile>) {
+    println!("Videos to compress:");
+    for asset in assets {
+        println!("{}", asset.path().display());
+    }
 }
 
 mod scanner;
@@ -39,7 +43,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             process::exit(1);
         }
     };
-    println!("Input: {:?}", input);
     
     let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
     let config = FileScannerConfig::new(input, white_list);
@@ -49,10 +52,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     match assets {
         Ok(assets) => {
-            println!("Files:");
-            for asset in assets {
-                println!("Path: {}", asset.path().display());
-            }
+            cli.list.then(|| {
+                list_files(&assets);
+                process::exit(0);
+            });
         },
         Err(e) => {
             eprintln!("Operation failed: {}", e);
@@ -61,7 +64,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     
     cli.delete.then(|| { delete_original() });
-    cli.list.then(|| { list_files() });
     
     Ok(())
 }
