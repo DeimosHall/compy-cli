@@ -1,7 +1,6 @@
 use std::{error::Error, process};
 use std::path::{PathBuf};
 use clap::{Parser};
-use walkdir::WalkDir;
 
 use crate::scanner::{FileScanner, FileScannerConfig};
 
@@ -52,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(assets) => {
             println!("Files:");
             for asset in assets {
-                println!("Path: {:?}", asset.path());
+                println!("Path: {}", asset.path().display());
             }
         },
         Err(e) => {

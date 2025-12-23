@@ -22,15 +22,15 @@ impl VideoFile {
         VideoFile { path, status: VideoStatus::Pending }
     }
     
-    pub fn path(self) -> PathBuf {
-        self.path
+    pub fn path(&self) -> &PathBuf {
+        &self.path
     }
     
-    pub fn status(self) -> VideoStatus {
-        self.status
+    pub fn status(&self) -> &VideoStatus {
+        &self.status
     }
     
-    pub fn set_status(mut self, status: VideoStatus) {
+    pub fn set_status(&mut self, status: VideoStatus) {
         self.status = status;
     }
 }
@@ -56,22 +56,24 @@ impl<'a> FileScanner<'a> {
         FileScanner { config, assets: vec![] }
     }
     
-    fn is_video_file(&self, path: &PathBuf) -> bool {
-        if !path.exists() {
-            return false;
+    fn is_in_white_list(&self, path: &PathBuf) -> bool {
+        let extension = path.extension();
+        
+        match extension {
+            Some(extension) => {
+                return self.config.white_list.iter().any(|&i| {
+                    i == extension.to_ascii_lowercase()
+                });
+            }
+            None => return false
         }
-        
-        // logic here
-        
-        true
     }
     
     fn add_asset(&mut self, path: PathBuf) {
-        if !self.is_video_file(&path) {
+        if !self.is_in_white_list(&path) {
             return;
         }
         
-        // Skip check white list for now
         let asset = VideoFile::new(path);
         self.assets.push(asset);
     }
