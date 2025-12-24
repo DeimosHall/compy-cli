@@ -38,29 +38,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     let input = match cli.input {
         Some(input) => input,
-        None => {
-            eprintln!("No input provided");
-            process::exit(1);
-        }
+        None => return Err("No input provided".into())
     };
     
     let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
     let config = FileScannerConfig::new(input, white_list);
     let mut file_scanner = FileScanner::new(config);
     
-    let assets = file_scanner.scan();
+    let assets = file_scanner.scan()?;
     
-    match assets {
-        Ok(assets) => {
-            cli.list.then(|| {
-                list_files(&assets);
-                process::exit(0);
-            });
-        },
-        Err(e) => {
-            eprintln!("Operation failed: {}", e);
-            process::exit(1);
-        }
+    if cli.list {
+        list_files(&assets);
+        return Ok(());
     }
     
     cli.delete.then(|| { delete_original() });
