@@ -32,6 +32,7 @@ fn list_files(assets: &Vec<VideoFile>) {
 }
 
 mod scanner;
+mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
@@ -40,6 +41,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(input) => input,
         None => return Err("No input provided".into())
     };
+    
+    if !utils::is_ffmpeg_installed() {
+        return Err("FFmpeg is not installed".into());
+    }
     
     let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
     let config = FileScannerConfig::new(input, white_list);
