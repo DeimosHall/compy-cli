@@ -1,9 +1,8 @@
-use std::process::ExitCode;
-use std::{error::Error, process};
+use std::{error::Error};
 use std::path::{PathBuf};
 use clap::{Parser};
 
-use crate::scanner::{FileScanner, FileScannerConfig, VideoFile};
+use crate::scanner::{FileScanner, FileScannerConfig};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -20,19 +19,9 @@ struct Cli {
     list: bool
 }
 
-fn delete_original() {
-    println!("Deleting original file...");
-}
-
-fn list_files(assets: &Vec<VideoFile>) {
-    println!("Videos to compress:");
-    for asset in assets {
-        println!("{}", asset.path().display());
-    }
-}
-
 mod scanner;
 mod utils;
+mod processor;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
@@ -50,14 +39,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = FileScannerConfig::new(input, white_list);
     let mut file_scanner = FileScanner::new(config);
     
-    let assets = file_scanner.scan()?;
+    let mut assets = file_scanner.scan()?;
     
     if cli.list {
-        list_files(&assets);
+        utils::list_files(&assets);
         return Ok(());
     }
     
-    cli.delete.then(|| { delete_original() });
-    
+    processor::compress_assets(&mut assets)?;
+    utils::report_summary(&assets);
     Ok(())
 }

@@ -3,7 +3,7 @@ use std::{error::Error, io, path::PathBuf};
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, Clone)]
-enum VideoStatus {
+pub enum VideoStatus {
     Pending,
     Processing,
     Completed,
@@ -69,8 +69,26 @@ impl<'a> FileScanner<'a> {
         }
     }
     
+    fn is_compressed(&self, path: &PathBuf) -> bool {
+        let file_name = path.file_name();
+        
+        match file_name {
+            Some(file_name) => {
+                match file_name.to_str() {
+                    Some(name) => name.contains("compressed"),
+                    None => false
+                }
+            },
+            None => return false
+        }
+    }
+    
     fn add_asset(&mut self, path: PathBuf) {
         if !self.is_in_white_list(&path) {
+            return;
+        }
+        
+        if self.is_compressed(&path) {
             return;
         }
         
