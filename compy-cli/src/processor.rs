@@ -1,4 +1,4 @@
-use std::{error::Error, process::Command};
+use std::{error::Error, process::{Command, Stdio}};
 
 use crate::{scanner::{VideoFile, VideoStatus}, utils};
 
@@ -7,10 +7,12 @@ pub fn compress_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
     let new_file_name = utils::get_compressed_file_name(&asset.path())?;
     
     if new_file_name.exists() {
+        println!("{} is already compressed", asset.path().display());
         asset.set_status(VideoStatus::Skipped);
+        return Ok(());
     }
     
-    println!("New file name: {}", new_file_name.display());
+    println!("Compressing {}", asset.path().display());
     
     let status = Command::new("ffmpeg")
         .arg("-i")
@@ -30,13 +32,13 @@ pub fn compress_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
         .arg("warning")
         .arg("-hide_banner")
         .arg("-stats")
+        .stderr(Stdio::null())
         .status();
-    
-    dbg!(&status);
     
     if status?.success() {
         asset.set_status(VideoStatus::Completed);
     } else {
+        eprintln!("Error compressing {}", asset.path().display());
         asset.set_status(VideoStatus::Failed);
     }
     

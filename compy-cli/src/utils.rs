@@ -1,9 +1,14 @@
-use std::{path::PathBuf, process::Command};
+use std::{path::PathBuf, process::{Command, Stdio}};
 
 use crate::scanner::VideoFile;
 
 pub fn is_ffmpeg_installed() -> bool {
-    let status = Command::new("ffmpeg").arg("-version").status();
+    let status = Command::new("ffmpeg")
+        .arg("-version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    
     match status {
         Ok(status) => status.success(),
         Err(_) => false
@@ -24,7 +29,7 @@ pub fn get_compressed_file_name(path: &PathBuf) -> Result<PathBuf, String> {
 }
 
 pub fn report_summary(assets: &Vec<VideoFile>) {
-    println!("Summary...");
+    println!("\nSummary...");
     for asset in assets {
         println!("{} - {:?}", &asset.path().display(), &asset.status());
     }
