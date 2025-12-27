@@ -1,20 +1,9 @@
-use std::{error::Error, process::{Command, Stdio}};
+use std::{error::Error, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
 use crate::{scanner::{VideoFile, VideoStatus}, utils};
 
-pub fn compress_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
-    asset.set_status(VideoStatus::Processing);
-    let new_file_name = utils::get_compressed_file_name(&asset.path())?;
-    
-    if new_file_name.exists() {
-        println!("{} is already compressed", asset.path().display());
-        asset.set_status(VideoStatus::Skipped);
-        return Ok(());
-    }
-    
-    println!("Compressing {}", asset.path().display());
-    
-    let status = Command::new("ffmpeg")
+fn compress_asset(asset: &mut VideoFile, compressed_file_name: PathBuf) -> Result<ExitStatus, Box<dyn Error>> {
+    Ok(Command::new("ffmpeg")
         .arg("-i")
         .arg(asset.path())
         .arg("-vcodec")
@@ -27,13 +16,27 @@ pub fn compress_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
         .arg("128k")
         .arg("-map_metadata")
         .arg("0")
-        .arg(new_file_name)
+        .arg(compressed_file_name)
         .arg("-v")
         .arg("warning")
         .arg("-hide_banner")
         .arg("-stats")
         .stderr(Stdio::null())
-        .status();
+        .status()?)
+}
+
+pub fn process_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
+    asset.set_status(VideoStatus::Processing);
+    let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
+    
+    if compressed_file_name.exists() {
+        println!("{} is already compressed", asset.path().display());
+        asset.set_status(VideoStatus::Skipped);
+        return Ok(());
+    }
+    
+    println!("Compressing {}", asset.path().display());
+    let status = compress_asset(asset, compressed_file_name);
     
     if status?.success() {
         asset.set_status(VideoStatus::Completed);
@@ -45,9 +48,9 @@ pub fn compress_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn compress_assets(assets: &mut Vec<VideoFile>) -> Result<(), Box<dyn Error>> {
+pub fn process_assets(assets: &mut Vec<VideoFile>) -> Result<(), Box<dyn Error>> {
     for asset in assets {
-        compress_asset(asset)?;
+        process_asset(asset)?;
     }
     
     Ok(())

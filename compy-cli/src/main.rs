@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     
-    processor::compress_assets(&mut assets)?;
+    processor::process_assets(&mut assets)?;
     utils::report_summary(&assets);
     Ok(())
 }
