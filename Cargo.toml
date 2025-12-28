@@ -1,5 +1,5 @@
 [package]
-name = "compy-cli"
+name = "compy"
 version = "0.1.0"
 edition = "2024"
 
