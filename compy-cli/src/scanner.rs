@@ -33,6 +33,24 @@ impl VideoFile {
     pub fn set_status(&mut self, status: VideoStatus) {
         self.status = status;
     }
+    
+    pub fn size(&self) -> Option<u64> {
+        match self.path.metadata() {
+            Ok(metadata) => Some(metadata.len()),
+            Err(_) => None
+        }
+    }
+    
+    pub fn size_mb(&self) -> Option<u64> {
+        match self.size() {
+            Some(size) => Some(size / 1024 / 1024),
+            None => None
+        }
+    }
+    
+    pub fn is_greater_than(&self, video: &VideoFile) -> bool {
+        self.size() >= video.size()
+    }
 }
 
 pub struct FileScannerConfig<'a> {

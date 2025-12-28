@@ -2,7 +2,7 @@ use std::{error::Error, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
 use crate::{scanner::{VideoFile, VideoStatus}, utils};
 
-fn compress_asset(asset: &mut VideoFile, compressed_file_name: PathBuf) -> Result<ExitStatus, Box<dyn Error>> {
+fn compress_asset(asset: &mut VideoFile, compressed_file_name: &PathBuf) -> Result<ExitStatus, Box<dyn Error>> {
     Ok(Command::new("ffmpeg")
         .arg("-i")
         .arg(asset.path())
@@ -25,6 +25,20 @@ fn compress_asset(asset: &mut VideoFile, compressed_file_name: PathBuf) -> Resul
         .status()?)
 }
 
+fn verify_successfull_compression(original: &mut VideoFile, compressed_file: PathBuf) -> Result<(), String> {
+    let compressed_video = VideoFile::new(compressed_file);
+    if compressed_video.is_greater_than(&original) {
+        // TODO: Delete not compressed video file
+        original.set_status(VideoStatus::Failed);
+        eprintln!("Compressed is greater than original");
+        let original_size = original.size_mb().ok_or(format!("Error reading {} file size", original.path().display()));
+        let compressed_size = compressed_video.size_mb().ok_or(format!("Error reading {} file size", compressed_video.path().display()));
+        eprintln!("Original: {}, compressed: {}", original_size?, compressed_size?);
+    }
+    
+    Ok(())
+}
+
 pub fn process_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
     asset.set_status(VideoStatus::Processing);
     let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
@@ -36,10 +50,11 @@ pub fn process_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
     }
     
     println!("Compressing {}", asset.path().display());
-    let status = compress_asset(asset, compressed_file_name);
+    let status = compress_asset(asset, &compressed_file_name);
     
     if status?.success() {
         asset.set_status(VideoStatus::Completed);
+        verify_successfull_compression(asset, compressed_file_name)?;
     } else {
         eprintln!("Error compressing {}", asset.path().display());
         asset.set_status(VideoStatus::Failed);
