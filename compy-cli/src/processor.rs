@@ -1,6 +1,6 @@
-use std::{error::Error, path::PathBuf, process::{Command, ExitStatus, Stdio}};
+use std::{error::Error, fs, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
-use crate::{scanner::{VideoFile, VideoStatus}, utils};
+use crate::{Cli, scanner::{VideoFile, VideoStatus}, utils};
 
 fn compress_asset(asset: &mut VideoFile, compressed_file_name: &PathBuf) -> Result<ExitStatus, Box<dyn Error>> {
     Ok(Command::new("ffmpeg")
@@ -25,21 +25,30 @@ fn compress_asset(asset: &mut VideoFile, compressed_file_name: &PathBuf) -> Resu
         .status()?)
 }
 
-fn verify_successfull_compression(original: &mut VideoFile, compressed_file: PathBuf) -> Result<(), String> {
+fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
+    println!("Deleting {}", asset.path().display());
+    fs::remove_file(asset.path())?;
+    Ok(())
+}
+
+fn verify_successfull_compression(original: &mut VideoFile, compressed_file: PathBuf, cli: &Cli) -> Result<(), String> {
     let compressed_video = VideoFile::new(compressed_file);
     if compressed_video.is_greater_than(&original) {
-        // TODO: Delete not compressed video file
         original.set_status(VideoStatus::Failed);
         eprintln!("Compressed is greater than original");
         let original_size = original.size_mb().ok_or(format!("Error reading {} file size", original.path().display()));
         let compressed_size = compressed_video.size_mb().ok_or(format!("Error reading {} file size", compressed_video.path().display()));
         eprintln!("Original: {}, compressed: {}", original_size?, compressed_size?);
+        // TODO: Show error message
+        let _ = delete_file(&compressed_video);
+    } else {
+        cli.delete.then(|| { delete_file(original) });
     }
     
     Ok(())
 }
 
-pub fn process_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
+pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
     asset.set_status(VideoStatus::Processing);
     let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
     
@@ -54,7 +63,7 @@ pub fn process_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
     
     if status?.success() {
         asset.set_status(VideoStatus::Completed);
-        verify_successfull_compression(asset, compressed_file_name)?;
+        verify_successfull_compression(asset, compressed_file_name, cli)?;
     } else {
         eprintln!("Error compressing {}", asset.path().display());
         asset.set_status(VideoStatus::Failed);
@@ -63,9 +72,9 @@ pub fn process_asset(asset: &mut VideoFile) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn process_assets(assets: &mut Vec<VideoFile>) -> Result<(), Box<dyn Error>> {
+pub fn process_assets(assets: &mut Vec<VideoFile>, cli: &Cli) -> Result<(), Box<dyn Error>> {
     for asset in assets {
-        process_asset(asset)?;
+        process_asset(asset, cli)?;
     }
     
     Ok(())

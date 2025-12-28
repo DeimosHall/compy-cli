@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     
     let input = match cli.input {
-        Some(input) => input,
+        Some(ref input) => input,
         None => return Err("No input provided".into())
     };
     
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     
     let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
-    let config = FileScannerConfig::new(input, white_list);
+    let config = FileScannerConfig::new(input.to_path_buf(), white_list);
     let mut file_scanner = FileScanner::new(config);
     
     let mut assets = file_scanner.scan()?;
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     
-    processor::process_assets(&mut assets)?;
+    processor::process_assets(&mut assets, &cli)?;
     utils::report_summary(&assets);
     Ok(())
 }
