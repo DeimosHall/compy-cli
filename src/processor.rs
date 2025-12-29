@@ -25,6 +25,17 @@ fn compress_asset(asset: &mut VideoFile, compressed_file_name: &PathBuf) -> Resu
         .status()?)
 }
 
+// TODO: set time zone
+fn set_creation_date(asset: &VideoFile) -> Result<ExitStatus, Box<dyn Error>> {
+    Ok(Command::new("exiftool")
+        .arg("-Keys:CreationDate<${CreateDate}-06:00")
+        .arg("-overwrite_original")
+        .arg(asset.path())
+        .stderr(Stdio::null())
+        .status()?
+    )
+}
+
 fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
     println!("Deleting {}", asset.path().display());
     fs::remove_file(asset.path())?;
@@ -42,6 +53,8 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed_file: Pat
         // TODO: Show error message
         let _ = delete_file(&compressed_video);
     } else {
+        // TODO: also show error here
+        let _ = set_creation_date(&compressed_video);
         cli.delete.then(|| { delete_file(original) });
     }
     
