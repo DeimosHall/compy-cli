@@ -25,10 +25,11 @@ fn compress_asset(asset: &mut VideoFile, compressed_file_name: &PathBuf) -> Resu
         .status()?)
 }
 
-// TODO: set time zone
-fn set_creation_date(asset: &VideoFile) -> Result<ExitStatus, Box<dyn Error>> {
+fn set_creation_date(asset: &VideoFile, time_zone: String) -> Result<ExitStatus, Box<dyn Error>> {
+    let creation_date = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
+    
     Ok(Command::new("exiftool")
-        .arg("-Keys:CreationDate<${CreateDate}-06:00")
+        .arg(creation_date)
         .arg("-overwrite_original")
         .arg(asset.path())
         .stderr(Stdio::null())
@@ -53,8 +54,8 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed_file: Pat
         // TODO: Show error message
         let _ = delete_file(&compressed_video);
     } else {
-        // TODO: also show error here
-        let _ = set_creation_date(&compressed_video);
+        // TODO: also show error here and handle the time zone properly
+        let _ = set_creation_date(&compressed_video, String::from("-06:00"));
         cli.delete.then(|| { delete_file(original) });
     }
     
