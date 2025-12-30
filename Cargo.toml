@@ -1,0 +1,17 @@
+[package]
+name = "compy-cli"
+version = "0.1.0"
+authors = ["Deimos Hall deimoshall.dev@proton.me"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/DeimosHall/compy-cli"
+description = "`compy-cli` is a command-line interface tool to compress videos using an opinionated FFmpeg command template. It can compress a single video or a bunch of them if a directory is passed through arguments."
+readme = "README.md"
+
+[[bin]]
+name = "compy"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.53", features = ["derive"] }
+walkdir = "2.5.0"
