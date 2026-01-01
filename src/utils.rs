@@ -1,4 +1,4 @@
-use std::{error::Error, fs, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
+use std::{fs, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
 use crate::scanner::VideoFile;
 
@@ -41,7 +41,8 @@ pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
     Ok(())
 }
 
-pub fn set_creation_date(asset: &VideoFile, time_zone: String) -> Result<ExitStatus, Box<dyn Error>> {
+// TODO: status doesn't indicate if the command was able to modify the date
+pub fn set_creation_date(asset: &VideoFile, time_zone: String) -> Result<ExitStatus, io::Error> {
     let creation_date = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
     
     Ok(Command::new("exiftool")

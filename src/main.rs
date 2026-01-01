@@ -22,6 +22,7 @@ struct Cli {
 mod scanner;
 mod utils;
 mod processor;
+pub mod errors;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
