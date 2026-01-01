@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::{Command, Stdio}};
+use std::{error::Error, fs, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
 use crate::scanner::VideoFile;
 
@@ -33,4 +33,22 @@ pub fn report_summary(assets: &Vec<VideoFile>) {
     for asset in assets {
         println!("{} - {:?}", &asset.path().display(), &asset.status());
     }
+}
+
+pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
+    println!("Deleting {}", asset.path().display());
+    fs::remove_file(asset.path())?;
+    Ok(())
+}
+
+pub fn set_creation_date(asset: &VideoFile, time_zone: String) -> Result<ExitStatus, Box<dyn Error>> {
+    let creation_date = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
+    
+    Ok(Command::new("exiftool")
+        .arg(creation_date)
+        .arg("-overwrite_original")
+        .arg(asset.path())
+        .stderr(Stdio::null())
+        .status()?
+    )
 }
