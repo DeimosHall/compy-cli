@@ -28,6 +28,7 @@ fn compress_asset(asset: &mut VideoFile, destination_asset: &VideoFile) -> Resul
 fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFile, cli: &Cli) -> Result<(), CompressionError> {
     if compressed.is_greater_than(&original) {
         original.set_status(VideoStatus::Failed);
+        
         let original_size = original.size_mb().ok_or(CompressionError::FileSizeError("Error reading original file size".to_string()))?;
         let compressed_size = compressed.size_mb().ok_or(CompressionError::FileSizeError("Error reading compressed file size".to_string()))?;
         
@@ -39,8 +40,7 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
         let err_msg = format!("Compressed is greater than original. Original: {} MB, compressed: {} MB", original_size, compressed_size);
         return Err(CompressionError::CompressionFailed(err_msg));
     } else {
-        // TODO: handle the time zone properly
-        if let Err(e) = utils::set_creation_date(&compressed, String::from("-06:00")) {
+        if let Err(e) = compressed.set_creation_date() {
             original.set_status(VideoStatus::PostProcessingFailed);
             let err_msg = format!("Error setting creation date to {},", &compressed.path().display());
             return Err(CompressionError::DateError(err_msg, e));
@@ -67,7 +67,6 @@ pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Err
     let compressed_asset = VideoFile::new(compressed_file_name);
     
     if compressed_asset.path().exists() {
-        println!("{} is already compressed", asset.path().display());
         asset.set_status(VideoStatus::Skipped);
         return Ok(());
     }
@@ -76,7 +75,6 @@ pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Err
     let status = compress_asset(asset, &compressed_asset);
     
     if status?.success() {
-        // TODO: skip instead of fail
         if let Err(e) = verify_successfull_compression(asset, &compressed_asset, cli) {
             eprintln!("Compression failed: {}", e);   
         }

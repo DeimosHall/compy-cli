@@ -1,4 +1,4 @@
-use std::{error::Error, fmt, io, path::PathBuf};
+use std::{error::Error, fmt, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
 use walkdir::{DirEntry, WalkDir};
 
@@ -71,6 +71,34 @@ impl VideoFile {
             Ok(info) => Some(info.format.tags.and_then(|tags| tags.creation_time)?),
             Err(_) => None
         }
+    }
+    
+    /// Sets the `CreationDate` tag (Apple/QuickTime) using the `CreateDate`
+    /// tag (UTC) with the given offset.
+    pub fn set_creation_date_with_time_zone(&self, time_zone: String) -> Result<ExitStatus, io::Error> {
+        // CreateDate is stored in UTC, so we need the time zone to shift the time accordingly
+        let creation_date_arg = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
+        
+        if self.creation_time().is_none() {
+            return Err(io::Error::new(io::ErrorKind::Other, "Creation time not available on video asset"));
+        }
+        
+        Ok(Command::new("exiftool")
+            .arg(creation_date_arg)
+            .arg("-overwrite_original")
+            .arg(self.path())
+            .stderr(Stdio::null())
+            .stdout(Stdio::null())
+            .status()?)
+    }
+    
+    /// Sets the `CreationDate` tag (Apple/QuickTime) using the `CreateDate`
+    /// tag (UTC) with the current OS offset.
+    pub fn set_creation_date(&self) -> Result<ExitStatus, io::Error> {
+        let binding = chrono::Local::now();
+        let time_zone = binding.offset();
+        dbg!(&time_zone);
+        self.set_creation_date_with_time_zone(time_zone.to_string())
     }
 }
 
