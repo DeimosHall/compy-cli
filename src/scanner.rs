@@ -51,6 +51,13 @@ impl VideoFile {
     pub fn is_greater_than(&self, video: &VideoFile) -> bool {
         self.size() >= video.size()
     }
+    
+    pub fn creation_time(&self) -> Option<String> {
+        match ffprobe::ffprobe(&self.path) {
+            Ok(info) => Some(info.format.tags.and_then(|tags| tags.creation_time)?),
+            Err(_) => None
+        }
+    }
 }
 
 pub struct FileScannerConfig<'a> {

@@ -52,12 +52,15 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
             }
         }
         
+        original.set_status(VideoStatus::Completed);
+        
         Ok(())
     }
 }
 
 pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
     asset.set_status(VideoStatus::Processing);
+    // TODO: skip instead of fail
     let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
     let asset_to_compress = VideoFile::new(compressed_file_name);
     
@@ -71,7 +74,7 @@ pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Err
     let status = compress_asset(asset, &asset_to_compress);
     
     if status?.success() {
-        asset.set_status(VideoStatus::Completed);
+        // TODO: skip instead of fail
         verify_successfull_compression(asset, &asset_to_compress, cli)?;
     } else {
         eprintln!("Error compressing {}", asset.path().display());

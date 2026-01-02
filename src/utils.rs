@@ -43,13 +43,20 @@ pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
 
 // TODO: status doesn't indicate if the command was able to modify the date
 pub fn set_creation_date(asset: &VideoFile, time_zone: String) -> Result<ExitStatus, io::Error> {
-    let creation_date = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
+    let creation_date_arg = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
+    println!("Creation time: {}", asset.creation_time().unwrap_or("unknown".to_string()));
     
-    Ok(Command::new("exiftool")
-        .arg(creation_date)
+    if asset.creation_time().is_none() {
+        return Err(io::Error::new(io::ErrorKind::Other, "Creation time not available on video asset"));
+    }
+    
+    let result = Command::new("exiftool")
+        .arg(creation_date_arg)
         .arg("-overwrite_original")
         .arg(asset.path())
         .stderr(Stdio::null())
-        .status()?
-    )
+        .stdout(Stdio::null())
+        .output()?;
+    
+    Ok(result.status)
 }
