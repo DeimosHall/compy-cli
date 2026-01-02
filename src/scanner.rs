@@ -97,7 +97,7 @@ impl VideoFile {
     pub fn set_creation_date(&self) -> Result<ExitStatus, io::Error> {
         let binding = chrono::Local::now();
         let time_zone = binding.offset();
-        dbg!(&time_zone);
+
         self.set_creation_date_with_time_zone(time_zone.to_string())
     }
 }

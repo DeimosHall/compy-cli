@@ -54,9 +54,6 @@ fn main() {
         return;
     }
     
-    if let Err(e) = processor::process_assets(&mut assets, &cli) {
-        eprintln!("Application error: {}", e);
-    }
-    
+    processor::process_assets(&mut assets, &cli);
     utils::report_summary(&assets);
 }
