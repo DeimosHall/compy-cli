@@ -148,6 +148,11 @@ impl<'a> FileScanner<'a> {
             }
         }
         
+        if self.assets.is_empty() {
+            let error = io::Error::new(io::ErrorKind::NotFound, "No valid videos were found");
+            return Err(Box::new(error));
+        }
+        
         Ok(self.assets.clone())
     }
 }

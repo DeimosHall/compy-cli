@@ -1,4 +1,4 @@
-use std::{error::Error};
+use std::process;
 use std::path::{PathBuf};
 use clap::{Parser};
 
@@ -24,30 +24,39 @@ mod utils;
 mod processor;
 pub mod errors;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     let cli = Cli::parse();
     
     let input = match cli.input {
         Some(ref input) => input,
-        None => return Err("No input provided".into())
+        None => {
+            eprintln!("No input provided");
+            process::exit(1);
+        }
     };
     
     if !utils::is_ffmpeg_installed() {
-        return Err("FFmpeg is not installed".into());
+        eprintln!("FFmpeg is not installed");
+        process::exit(1);
     }
     
     let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
     let config = FileScannerConfig::new(input.to_path_buf(), white_list);
     let mut file_scanner = FileScanner::new(config);
     
-    let mut assets = file_scanner.scan()?;
+    let mut assets = file_scanner.scan().unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        process::exit(1);
+    });
     
     if cli.list {
         utils::list_files(&assets);
-        return Ok(());
+        return;
     }
     
-    processor::process_assets(&mut assets, &cli)?;
+    if let Err(e) = processor::process_assets(&mut assets, &cli) {
+        eprintln!("Application error: {}", e);
+    }
+    
     utils::report_summary(&assets);
-    Ok(())
 }
