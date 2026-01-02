@@ -1,4 +1,4 @@
-use std::{error::Error, io, path::PathBuf};
+use std::{error::Error, fmt, io, path::PathBuf};
 
 use walkdir::{DirEntry, WalkDir};
 
@@ -9,6 +9,20 @@ pub enum VideoStatus {
     Completed,
     Skipped,
     Failed,
+    PostProcessingFailed,
+}
+
+impl fmt::Display for VideoStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VideoStatus::Pending => write!(f, "Pending"),
+            VideoStatus::Processing => write!(f, "Processing"),
+            VideoStatus::Completed => write!(f, "Completed"),
+            VideoStatus::Skipped => write!(f, "Skipped"),
+            VideoStatus::Failed => write!(f, "Failed"),
+            VideoStatus::PostProcessingFailed => write!(f, "Post processing failed"),
+        }
+    }
 }
 
 #[derive(Clone)]

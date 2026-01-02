@@ -31,7 +31,7 @@ pub fn get_compressed_file_name(path: &PathBuf) -> Result<PathBuf, String> {
 pub fn report_summary(assets: &Vec<VideoFile>) {
     println!("\nSummary...");
     for asset in assets {
-        println!("{} - {:?}", &asset.path().display(), &asset.status());
+        println!("{} - {}", &asset.path().display(), &asset.status());
     }
 }
 

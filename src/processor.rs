@@ -2,7 +2,7 @@ use std::{error::Error, process::{Command, ExitStatus, Stdio}};
 
 use crate::{Cli, errors::CompressionError, scanner::{VideoFile, VideoStatus}, utils};
 
-fn compress_asset(asset: &mut VideoFile, asset_to_compress: &VideoFile) -> Result<ExitStatus, Box<dyn Error>> {
+fn compress_asset(asset: &mut VideoFile, destination_asset: &VideoFile) -> Result<ExitStatus, Box<dyn Error>> {
     Ok(Command::new("ffmpeg")
         .arg("-i")
         .arg(asset.path())
@@ -16,7 +16,7 @@ fn compress_asset(asset: &mut VideoFile, asset_to_compress: &VideoFile) -> Resul
         .arg("128k")
         .arg("-map_metadata")
         .arg("0")
-        .arg(asset_to_compress.path())
+        .arg(destination_asset.path())
         .arg("-v")
         .arg("warning")
         .arg("-hide_banner")
@@ -41,12 +41,14 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
     } else {
         // TODO: handle the time zone properly
         if let Err(e) = utils::set_creation_date(&compressed, String::from("-06:00")) {
-            let err_msg = format!("Error setting creation date to {}", &compressed.path().display());
+            original.set_status(VideoStatus::PostProcessingFailed);
+            let err_msg = format!("Error setting creation date to {},", &compressed.path().display());
             return Err(CompressionError::DateError(err_msg, e));
         }
         
         if cli.delete {
             if let Err(e) = utils::delete_file(original) {
+                original.set_status(VideoStatus::PostProcessingFailed);
                 let err_msg = format!("Error deleting {}", &original.path().display());
                 return Err(CompressionError::IoError(err_msg, e));
             }
@@ -62,20 +64,22 @@ pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Err
     asset.set_status(VideoStatus::Processing);
     // TODO: skip instead of fail
     let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
-    let asset_to_compress = VideoFile::new(compressed_file_name);
+    let compressed_asset = VideoFile::new(compressed_file_name);
     
-    if asset_to_compress.path().exists() {
+    if compressed_asset.path().exists() {
         println!("{} is already compressed", asset.path().display());
         asset.set_status(VideoStatus::Skipped);
         return Ok(());
     }
     
     println!("Compressing {}", asset.path().display());
-    let status = compress_asset(asset, &asset_to_compress);
+    let status = compress_asset(asset, &compressed_asset);
     
     if status?.success() {
         // TODO: skip instead of fail
-        verify_successfull_compression(asset, &asset_to_compress, cli)?;
+        if let Err(e) = verify_successfull_compression(asset, &compressed_asset, cli) {
+            eprintln!("Compression failed: {}", e);   
+        }
     } else {
         eprintln!("Error compressing {}", asset.path().display());
         asset.set_status(VideoStatus::Failed);
