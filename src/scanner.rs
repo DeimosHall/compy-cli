@@ -104,11 +104,11 @@ impl VideoFile {
 
 pub struct FileScannerConfig<'a> {
     input: PathBuf,
-    white_list: Vec<&'a str>
+    white_list: &'a Vec<&'a str>
 }
 
 impl<'a> FileScannerConfig<'a> {
-    pub fn new(input: PathBuf, white_list: Vec<&'a str>) -> FileScannerConfig<'a> {
+    pub fn new(input: PathBuf, white_list: &'a Vec<&'a str>) -> FileScannerConfig<'a> {
         FileScannerConfig { input, white_list }
     }
 }

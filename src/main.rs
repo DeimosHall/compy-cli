@@ -16,7 +16,11 @@ struct Cli {
     
     /// List the files to be processed and exits without compressing
     #[arg(short, long)]
-    list: bool
+    list: bool,
+    
+    /// Show a list of valid file formats
+    #[arg(short, long)]
+    allowed: bool
 }
 
 mod scanner;
@@ -26,6 +30,14 @@ pub mod errors;
 
 fn main() {
     let cli = Cli::parse();
+    let white_list: Vec<&'static str> = vec!["mp4", "mov", "mkv"];
+    
+    if cli.allowed {
+        for (index, item) in white_list.iter().enumerate() {
+            println!("{} - {}", index + 1, item);
+        }
+        return;
+    }
     
     let input = match cli.input {
         Some(ref input) => input,
@@ -40,12 +52,12 @@ fn main() {
         process::exit(1);
     }
     
-    let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
-    let config = FileScannerConfig::new(input.to_path_buf(), white_list);
+    let config = FileScannerConfig::new(input.to_path_buf(), &white_list);
     let mut file_scanner = FileScanner::new(config);
     
     let mut assets = file_scanner.scan().unwrap_or_else(|e| {
         eprintln!("{}", e);
+        eprintln!("Run `compy --allowed` to see a list of valid video formats");
         process::exit(1);
     });
     
