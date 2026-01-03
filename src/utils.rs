@@ -35,8 +35,14 @@ pub fn report_summary(assets: &Vec<VideoFile>) {
     }
 }
 
+/// Attempts to move the file to trash, if the operation fails,
+/// attempts to delete the file permanently
 pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
-    println!("Deleting {}", asset.path().display());
-    fs::remove_file(asset.path())?;
+    if let Err(e) = trash::delete(asset.path()) {
+        eprintln!("Error moving {} to trash, attempting to delete. Reason: {}", asset.path().display(), e);
+        fs::remove_file(asset.path())?;
+    }
+    
+    println!("{} successfully deleted", asset.path().display());
     Ok(())
 }

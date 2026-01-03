@@ -16,4 +16,5 @@ path = "src/main.rs"
 chrono = "0.4.42"
 clap = { version = "4.5.53", features = ["derive"] }
 ffprobe = "=0.3.3"
+trash = "5.2.5"
 walkdir = "2.5.0"

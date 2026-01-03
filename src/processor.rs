@@ -29,8 +29,10 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
     if compressed.is_greater_than(&original) {
         original.set_status(VideoStatus::Failed);
         
-        let original_size = original.size_mb().ok_or(CompressionError::FileSizeError("Error reading original file size".to_string()))?;
-        let compressed_size = compressed.size_mb().ok_or(CompressionError::FileSizeError("Error reading compressed file size".to_string()))?;
+        let original_size = original.size_mb()
+            .ok_or(CompressionError::FileSizeError("Error reading original file size".to_string()))?;
+        let compressed_size = compressed.size_mb()
+            .ok_or(CompressionError::FileSizeError("Error reading compressed file size".to_string()))?;
         
         if let Err(e) = utils::delete_file(&compressed) {
             let err_msg = format!("Error deleting {}", &compressed.path().display(), );
@@ -87,7 +89,6 @@ pub fn process_assets(assets: &mut Vec<VideoFile>, cli: &Cli) {
     for asset in assets {
         process_asset(asset, cli).unwrap_or_else(|e| {
             eprintln!("{}", e);
-            asset.set_status(VideoStatus::Skipped);
         });
     }
 }
