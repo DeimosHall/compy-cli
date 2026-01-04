@@ -111,6 +111,10 @@ impl VideoFile {
             Err(_) => None
         }
     }
+    
+    pub fn duration_int(&self) -> Option<u64> {
+        Some(self.duration()?.round() as u64)
+    }
 }
 
 pub struct FileScannerConfig<'a> {

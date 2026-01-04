@@ -1,5 +1,7 @@
 use std::{fs, io, path::PathBuf, process::{Command, Stdio}};
 
+use regex::Captures;
+
 use crate::scanner::VideoFile;
 
 pub fn is_ffmpeg_installed() -> bool {
@@ -44,4 +46,12 @@ pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
     }
     
     Ok(())
+}
+
+pub fn captures_to_seconds(time_str: &Captures<'_>) -> u64 {
+    let hours = &time_str["hh"].parse::<u64>().unwrap();
+    let minutes = &time_str["mm"].parse::<u64>().unwrap();
+    let seconds = &time_str["ss"].parse::<u64>().unwrap();
+    
+    seconds + (minutes * 60) + (hours * 60 * 60)
 }
