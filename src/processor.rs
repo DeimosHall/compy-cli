@@ -108,8 +108,6 @@ pub fn process_asset(index: &usize, total: &usize, asset: &mut VideoFile, cli: &
         }
     });
     
-    multi_progress_bar.clear().unwrap();
-    
     if process.wait().unwrap().success() {
         verify_successfull_compression(asset, &compressed_asset, cli)?;
     } else {
