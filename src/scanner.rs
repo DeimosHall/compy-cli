@@ -1,5 +1,6 @@
 use std::{error::Error, fmt, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 
+use ffprobe::ffprobe;
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, Clone)]
@@ -99,6 +100,16 @@ impl VideoFile {
         let time_zone = binding.offset();
 
         self.set_creation_date_with_time_zone(time_zone.to_string())
+    }
+    
+    pub fn duration(&self) -> Option<f32> {
+        match ffprobe(self.path()) {
+            Ok(info) => {
+                let duration_str = info.streams.get(0).and_then(|stream| stream.duration.clone());
+                Some(duration_str?.parse::<f32>().unwrap_or(0.0))
+            },
+            Err(_) => None
+        }
     }
 }
 

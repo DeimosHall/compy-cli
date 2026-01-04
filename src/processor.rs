@@ -62,7 +62,7 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
     }
 }
 
-pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
+pub fn process_asset(index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
     asset.set_status(VideoStatus::Processing);
     
     let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
@@ -73,7 +73,9 @@ pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Err
         return Ok(());
     }
     
-    println!("Compressing {}", asset.path().display());
+    println!("Compressing {}/{} - {}", index, total, asset.path().display());
+    // TODO: Fix strange logic here, only send asset, return a tuble with status and
+    // compressed_asset
     let status = compress_asset(asset, &compressed_asset);
     
     if status?.success() {
@@ -86,8 +88,9 @@ pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Err
 }
 
 pub fn process_assets(assets: &mut Vec<VideoFile>, cli: &Cli) {
-    for asset in assets {
-        process_asset(asset, cli).unwrap_or_else(|e| {
+    let total = assets.len();
+    for (index, asset) in assets.iter_mut().enumerate() {
+        process_asset(&(index + 1), &total, asset, cli).unwrap_or_else(|e| {
             eprintln!("{}", e);
         });
     }

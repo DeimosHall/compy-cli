@@ -43,6 +43,5 @@ pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
         fs::remove_file(asset.path())?;
     }
     
-    println!("{} successfully deleted", asset.path().display());
     Ok(())
 }
