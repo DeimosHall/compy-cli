@@ -1,9 +1,69 @@
-use std::{error::Error, io::{self, BufRead, BufReader, Write, stdout}, process::{self, Command, ExitStatus, Stdio}, thread};
+use std::{error::Error, io::{self, BufRead, BufReader}, process::{self, Command, Stdio}, thread};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 
 use crate::{Cli, errors::CompressionError, scanner::{VideoFile, VideoStatus}, utils};
+
+pub trait Processor {
+    fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>>;
+}
+
+pub struct VideoProcessor { }
+
+impl Processor for VideoProcessor {
+    fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
+        asset.set_status(VideoStatus::Processing);
+        
+        let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
+        let compressed_asset = VideoFile::new(compressed_file_name);
+        
+        if compressed_asset.path().exists() {
+            asset.set_status(VideoStatus::Skipped);
+            return Ok(());
+        }
+        
+        // TODO: Fix strange logic here, only send asset, return a tuble with status and
+        // compressed_asset
+        let mut process = compress_asset(asset, &compressed_asset)?;
+        let stderr = process.stderr.take().expect("Failed to capture stderr");
+        
+        let multi_progress_bar = MultiProgress::new();
+        let duration = asset.duration_int().unwrap_or(0);
+        let style = ProgressStyle::default_bar()
+            .template("{msg}\n[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+            .expect("Failed to create progress bar style");
+        let progress_bar = multi_progress_bar.add(ProgressBar::new(duration));
+        progress_bar.set_style(style);
+        progress_bar.set_message(format!("[{}/{}] Compressing - {}", index, total, asset.path().display()));
+        
+        let regex = Regex::new(r"time=(?P<hh>\d{2}):(?P<mm>\d{2}):(?P<ss>\d{2})\.(?P<ms>\d{2})").unwrap();
+        
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut buffer = Vec::new();
+            
+            while let Ok(n) = reader.read_until(b'\r', &mut buffer) {
+                if n == 0 { break; }
+                let line = String::from_utf8_lossy(&buffer);
+                
+                if let Some(caps) = regex.captures(&line) {
+                    progress_bar.set_position(utils::captures_to_seconds(&caps));
+                }
+                
+                buffer.clear();
+            }
+        });
+        
+        if process.wait().unwrap().success() {
+            verify_successfull_compression(asset, &compressed_asset, cli)?;
+        } else {
+            asset.set_status(VideoStatus::Failed);
+        }
+        
+        Ok(())
+    }
+}
 
 fn compress_asset(asset: &mut VideoFile, destination_asset: &VideoFile) -> Result<process::Child, io::Error> {
     Ok(Command::new("ffmpeg")
@@ -65,62 +125,10 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
     }
 }
 
-pub fn process_asset(index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
-    asset.set_status(VideoStatus::Processing);
-    
-    let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
-    let compressed_asset = VideoFile::new(compressed_file_name);
-    
-    if compressed_asset.path().exists() {
-        asset.set_status(VideoStatus::Skipped);
-        return Ok(());
-    }
-    
-    // TODO: Fix strange logic here, only send asset, return a tuble with status and
-    // compressed_asset
-    let mut process = compress_asset(asset, &compressed_asset)?;
-    let stderr = process.stderr.take().expect("Failed to capture stderr");
-    
-    let multi_progress_bar = MultiProgress::new();
-    let duration = asset.duration_int().unwrap_or(0);
-    let style = ProgressStyle::default_bar()
-        .template("{msg}\n[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
-        .expect("Failed to create progress bar style");
-    let progress_bar = multi_progress_bar.add(ProgressBar::new(duration));
-    progress_bar.set_style(style);
-    progress_bar.set_message(format!("[{}/{}] Compressing - {}", index, total, asset.path().display()));
-    
-    let regex = Regex::new(r"time=(?P<hh>\d{2}):(?P<mm>\d{2}):(?P<ss>\d{2})\.(?P<ms>\d{2})").unwrap();
-    
-    thread::spawn(move || {
-        let mut reader = BufReader::new(stderr);
-        let mut buffer = Vec::new();
-        
-        while let Ok(n) = reader.read_until(b'\r', &mut buffer) {
-            if n == 0 { break; }
-            let line = String::from_utf8_lossy(&buffer);
-            
-            if let Some(caps) = regex.captures(&line) {
-                progress_bar.set_position(utils::captures_to_seconds(&caps));
-            }
-            
-            buffer.clear();
-        }
-    });
-    
-    if process.wait().unwrap().success() {
-        verify_successfull_compression(asset, &compressed_asset, cli)?;
-    } else {
-        asset.set_status(VideoStatus::Failed);
-    }
-    
-    Ok(())
-}
-
-pub fn process_assets(assets: &mut Vec<VideoFile>, cli: &Cli) {
+pub fn process_assets<P: Processor>(processor: &P, assets: &mut Vec<VideoFile>, cli: &Cli) {
     let total = assets.len();
     for (index, asset) in assets.iter_mut().enumerate() {
-        process_asset(&(index + 1), &total, asset, cli).unwrap_or_else(|e| {
+        processor.process(&(index + 1), &total, asset, cli).unwrap_or_else(|e| {
             eprintln!("{}", e);
         });
     }

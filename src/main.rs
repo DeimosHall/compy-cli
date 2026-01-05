@@ -2,6 +2,7 @@ use std::process;
 use std::path::{PathBuf};
 use clap::{Parser};
 
+use crate::processor::VideoProcessor;
 use crate::scanner::{FileScanner, FileScannerConfig};
 
 #[derive(Parser)]
@@ -66,6 +67,7 @@ fn main() {
         return;
     }
     
-    processor::process_assets(&mut assets, &cli);
+    let video_processor = VideoProcessor {};
+    processor::process_assets(&video_processor, &mut assets, &cli);
     utils::report_summary(&assets);
 }
