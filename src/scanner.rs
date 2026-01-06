@@ -100,3 +100,67 @@ impl<'a> FileScanner<'a> {
         Ok(self.assets.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    
+    fn get_white_list() -> Vec<&'static str> {
+        vec!["mp4", "mov", "mkv"]
+    }
+
+    fn create_empty_dir(dir: &str) {
+        fs::create_dir(dir).unwrap_or_else(|_| {delete_dir(dir);})
+    }
+    
+    fn delete_dir(dir: &str) {
+        fs::remove_dir_all(dir).unwrap_or_else(|_| {});
+    }
+    
+    fn create_data_test(files: &Vec<&str>, dir: &str) {
+        for file in files {
+            let file = format!("{}/{}", dir, file);
+            File::create(file).unwrap();
+        }
+    }
+    
+    #[test]
+    fn test_empty_dir() {
+        let dir = "assets";
+        let path = PathBuf::from(dir);
+        let white_list = get_white_list();
+        
+        create_empty_dir(dir);
+        
+        let config = FileScannerConfig::new(path, &white_list);
+        let mut scanner = FileScanner::new(config);
+        
+        if let Err(error) = scanner.scan() {
+            delete_dir(dir);
+            assert!(error.is::<io::Error>());
+            return;
+        }
+        delete_dir(dir);
+        assert!(false);  // It shouldn't reach here
+    }
+
+    #[test]
+    fn test_dir_with_data() {
+        let dir = "assets2";
+        let files = vec!["video1.mp4", "video2.mov", "video3.mkv", "document.txt", "image.png", "script.sh"];
+        let path = PathBuf::from(dir);
+        let white_list = get_white_list();
+        
+        create_empty_dir(dir);
+        create_data_test(&files, &dir);
+        
+        let config = FileScannerConfig::new(path, &white_list);
+        let mut scanner = FileScanner::new(config);
+        
+        let assets = scanner.scan().unwrap();
+        delete_dir(dir);
+        
+        assert_eq!(assets.len(), 3);
+    }
+}
