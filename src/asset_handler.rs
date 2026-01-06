@@ -3,7 +3,7 @@ use std::{fmt, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
 use ffprobe::ffprobe;
 
 #[derive(Debug, Clone)]
-pub enum VideoStatus {
+pub enum AssetStatus {
     Pending,
     Processing,
     Completed,
@@ -12,58 +12,74 @@ pub enum VideoStatus {
     PostProcessingFailed,
 }
 
-impl fmt::Display for VideoStatus {
+impl fmt::Display for AssetStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VideoStatus::Pending => write!(f, "Pending"),
-            VideoStatus::Processing => write!(f, "Processing"),
-            VideoStatus::Completed => write!(f, "Completed"),
-            VideoStatus::Skipped => write!(f, "Skipped"),
-            VideoStatus::Failed => write!(f, "Failed"),
-            VideoStatus::PostProcessingFailed => write!(f, "Post processing failed"),
+            AssetStatus::Pending => write!(f, "Pending"),
+            AssetStatus::Processing => write!(f, "Processing"),
+            AssetStatus::Completed => write!(f, "Completed"),
+            AssetStatus::Skipped => write!(f, "Skipped"),
+            AssetStatus::Failed => write!(f, "Failed"),
+            AssetStatus::PostProcessingFailed => write!(f, "Post processing failed"),
         }
     }
+}
+
+pub trait MediaAsset {
+    fn path(&self) -> &PathBuf;
+    
+    fn status(&self) -> &AssetStatus;
+    
+    fn set_status(&mut self, status: AssetStatus);
+    
+    fn size(&self) -> Option<u64>;
+    
+    fn size_mb(&self) -> Option<u64>;
+    
+    fn is_greater_than(&self, video: &VideoFile) -> bool;
 }
 
 #[derive(Clone)]
 pub struct VideoFile {
     path: PathBuf,
-    status: VideoStatus
+    status: AssetStatus
 }
 
-impl VideoFile {
-    pub fn new(path: PathBuf) -> VideoFile {
-        VideoFile { path, status: VideoStatus::Pending }
-    }
-    
-    pub fn path(&self) -> &PathBuf {
+impl MediaAsset for VideoFile {
+    fn path(&self) -> &PathBuf {
         &self.path
     }
     
-    pub fn status(&self) -> &VideoStatus {
+    fn status(&self) -> &AssetStatus {
         &self.status
     }
     
-    pub fn set_status(&mut self, status: VideoStatus) {
+    fn set_status(&mut self, status: AssetStatus) {
         self.status = status;
     }
     
-    pub fn size(&self) -> Option<u64> {
+    fn size(&self) -> Option<u64> {
         match self.path.metadata() {
             Ok(metadata) => Some(metadata.len()),
             Err(_) => None
         }
     }
     
-    pub fn size_mb(&self) -> Option<u64> {
+    fn size_mb(&self) -> Option<u64> {
         match self.size() {
             Some(size) => Some(size / 1024 / 1024),
             None => None
         }
     }
     
-    pub fn is_greater_than(&self, video: &VideoFile) -> bool {
+    fn is_greater_than(&self, video: &VideoFile) -> bool {
         self.size() >= video.size()
+    }
+}
+
+impl VideoFile {
+    pub fn new(path: PathBuf) -> VideoFile {
+        VideoFile { path, status: AssetStatus::Pending }
     }
     
     pub fn creation_time(&self) -> Option<String> {

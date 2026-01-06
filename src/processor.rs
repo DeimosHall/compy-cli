@@ -3,7 +3,8 @@ use std::{error::Error, io::{self, BufRead, BufReader}, process::{self, Command,
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 
-use crate::{Cli, asset_handler::{VideoFile, VideoStatus}, errors::CompressionError, utils};
+use crate::{Cli, asset_handler::{VideoFile, AssetStatus}, errors::CompressionError, utils};
+use crate::asset_handler::MediaAsset;
 
 pub trait Processor {
     fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>>;
@@ -13,13 +14,13 @@ pub struct VideoProcessor { }
 
 impl Processor for VideoProcessor {
     fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
-        asset.set_status(VideoStatus::Processing);
+        asset.set_status(AssetStatus::Processing);
         
         let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
         let compressed_asset = VideoFile::new(compressed_file_name);
         
         if compressed_asset.path().exists() {
-            asset.set_status(VideoStatus::Skipped);
+            asset.set_status(AssetStatus::Skipped);
             return Ok(());
         }
         
@@ -58,7 +59,7 @@ impl Processor for VideoProcessor {
         if process.wait().unwrap().success() {
             verify_successfull_compression(asset, &compressed_asset, cli)?;
         } else {
-            asset.set_status(VideoStatus::Failed);
+            asset.set_status(AssetStatus::Failed);
         }
         
         Ok(())
@@ -90,7 +91,7 @@ fn compress_asset(asset: &mut VideoFile, destination_asset: &VideoFile) -> Resul
 
 fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFile, cli: &Cli) -> Result<(), CompressionError> {
     if compressed.is_greater_than(&original) {
-        original.set_status(VideoStatus::Failed);
+        original.set_status(AssetStatus::Failed);
         
         let original_size = original.size_mb()
             .ok_or(CompressionError::FileSizeError("Error reading original file size".to_string()))?;
@@ -106,20 +107,20 @@ fn verify_successfull_compression(original: &mut VideoFile, compressed: &VideoFi
         return Err(CompressionError::CompressionFailed(err_msg));
     } else {
         if let Err(e) = compressed.set_creation_date() {
-            original.set_status(VideoStatus::PostProcessingFailed);
+            original.set_status(AssetStatus::PostProcessingFailed);
             let err_msg = format!("Error setting creation date to {},", &compressed.path().display());
             return Err(CompressionError::DateError(err_msg, e));
         }
         
         if cli.delete {
             if let Err(e) = utils::delete_file(original) {
-                original.set_status(VideoStatus::PostProcessingFailed);
+                original.set_status(AssetStatus::PostProcessingFailed);
                 let err_msg = format!("Error deleting {}", &original.path().display());
                 return Err(CompressionError::IoError(err_msg, e));
             }
         }
         
-        original.set_status(VideoStatus::Completed);
+        original.set_status(AssetStatus::Completed);
         
         Ok(())
     }

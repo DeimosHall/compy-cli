@@ -2,7 +2,7 @@ use std::{fs, io, path::PathBuf, process::{Command, Stdio}};
 
 use regex::Captures;
 
-use crate::asset_handler::VideoFile;
+use crate::asset_handler::{MediaAsset, VideoFile};
 
 pub fn is_ffmpeg_installed() -> bool {
     let status = Command::new("ffmpeg")
