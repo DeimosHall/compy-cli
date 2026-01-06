@@ -3,7 +3,7 @@ use std::{error::Error, io::{self, BufRead, BufReader}, process::{self, Command,
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 
-use crate::{Cli, errors::CompressionError, scanner::{VideoFile, VideoStatus}, utils};
+use crate::{Cli, asset_handler::{VideoFile, VideoStatus}, errors::CompressionError, utils};
 
 pub trait Processor {
     fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>>;

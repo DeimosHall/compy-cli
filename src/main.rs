@@ -27,6 +27,7 @@ struct Cli {
 mod scanner;
 mod utils;
 mod processor;
+pub mod asset_handler;
 pub mod errors;
 
 fn main() {
