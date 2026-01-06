@@ -13,6 +13,7 @@ The tool utilizes a standard POSIX-compliant flag structure.
 | `INPUT`         | N/A   | N/A      | Yes      | Path to a single video or a directory.                              |
 | Delete original | -d    | --delete | No       | If set, delete original file only after successful compression.     |
 | Dry Run / List  | -l    | --list   | No       | Lists the files to be processed and exits without compressing.      |
+| List allowed file formats  | -a    | --allowed   | No       | List allowed file formats and exits without compressing.      |
  
 ## 2.2 Usage examples
 
@@ -32,6 +33,12 @@ List all the videos that can be processed by the tool within a directory. Don't 
 
 ```bash
 compy my_videos/ --list
+```
+
+Lists all the file formats that are compatible with the tool. Don't compress any video.
+
+```bash
+compy --allowed
 ```
 
 ## License
