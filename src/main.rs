@@ -24,6 +24,16 @@ struct Cli {
     allowed: bool
 }
 
+struct AppConfig {
+    delete: bool,
+}
+
+impl AppConfig {
+    pub fn new(cli: &Cli) -> AppConfig {
+        AppConfig { delete: cli.delete }
+    }
+}
+
 mod scanner;
 mod utils;
 mod processor;
@@ -68,7 +78,8 @@ fn main() {
         return;
     }
     
-    let video_processor = VideoProcessor {};
-    processor::process_assets(&video_processor, &mut assets, &cli);
+    let app_config = AppConfig::new(&cli);
+    let video_processor = VideoProcessor::new();
+    processor::process_videos(&video_processor, &mut assets, &app_config);
     utils::report_summary(&assets);
 }
