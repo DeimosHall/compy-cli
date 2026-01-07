@@ -1,7 +1,8 @@
-use std::{error::Error};
+use std::process;
 use std::path::{PathBuf};
 use clap::{Parser};
 
+use crate::processor::VideoProcessor;
 use crate::scanner::{FileScanner, FileScannerConfig};
 
 #[derive(Parser)]
@@ -16,37 +17,69 @@ struct Cli {
     
     /// List the files to be processed and exits without compressing
     #[arg(short, long)]
-    list: bool
+    list: bool,
+    
+    /// Show a list of valid file formats
+    #[arg(short, long)]
+    allowed: bool
+}
+
+struct AppConfig {
+    delete: bool,
+}
+
+impl AppConfig {
+    pub fn new(cli: &Cli) -> AppConfig {
+        AppConfig { delete: cli.delete }
+    }
 }
 
 mod scanner;
 mod utils;
 mod processor;
+pub mod asset_handler;
+pub mod errors;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     let cli = Cli::parse();
+    let white_list: Vec<&'static str> = vec!["mp4", "mov", "mkv"];
+    
+    if cli.allowed {
+        for (index, item) in white_list.iter().enumerate() {
+            println!("{} - {}", index + 1, item);
+        }
+        return;
+    }
     
     let input = match cli.input {
         Some(ref input) => input,
-        None => return Err("No input provided".into())
+        None => {
+            eprintln!("No input provided");
+            process::exit(1);
+        }
     };
     
     if !utils::is_ffmpeg_installed() {
-        return Err("FFmpeg is not installed".into());
+        eprintln!("FFmpeg is not installed");
+        process::exit(1);
     }
     
-    let white_list: Vec<&'static str> = vec!["mp4", "mkv"];
-    let config = FileScannerConfig::new(input.to_path_buf(), white_list);
+    let config = FileScannerConfig::new(input.to_path_buf(), &white_list);
     let mut file_scanner = FileScanner::new(config);
     
-    let mut assets = file_scanner.scan()?;
+    let mut assets = file_scanner.scan().unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        eprintln!("Run `compy --allowed` to see a list of valid video formats");
+        process::exit(1);
+    });
     
     if cli.list {
         utils::list_files(&assets);
-        return Ok(());
+        return;
     }
     
-    processor::process_assets(&mut assets, &cli)?;
+    let app_config = AppConfig::new(&cli);
+    let video_processor = VideoProcessor::new();
+    processor::process_videos(&video_processor, &mut assets, &app_config);
     utils::report_summary(&assets);
-    Ok(())
 }

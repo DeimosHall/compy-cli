@@ -1,6 +1,8 @@
-use std::{path::PathBuf, process::{Command, Stdio}};
+use std::{fs, io, path::PathBuf, process::{Command, Stdio}};
 
-use crate::scanner::VideoFile;
+use regex::Captures;
+
+use crate::asset_handler::{MediaAsset, VideoFile};
 
 pub fn is_ffmpeg_installed() -> bool {
     let status = Command::new("ffmpeg")
@@ -31,6 +33,25 @@ pub fn get_compressed_file_name(path: &PathBuf) -> Result<PathBuf, String> {
 pub fn report_summary(assets: &Vec<VideoFile>) {
     println!("\nSummary...");
     for asset in assets {
-        println!("{} - {:?}", &asset.path().display(), &asset.status());
+        println!("{} - {}", &asset.path().display(), &asset.status());
     }
+}
+
+/// Attempts to move the file to trash, if the operation fails,
+/// attempts to delete the file permanently
+pub fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
+    if let Err(e) = trash::delete(asset.path()) {
+        eprintln!("Error moving {} to trash, attempting to delete. Reason: {}", asset.path().display(), e);
+        fs::remove_file(asset.path())?;
+    }
+    
+    Ok(())
+}
+
+pub fn captures_to_seconds(time_str: &Captures<'_>) -> u64 {
+    let hours = &time_str["hh"].parse::<u64>().unwrap();
+    let minutes = &time_str["mm"].parse::<u64>().unwrap();
+    let seconds = &time_str["ss"].parse::<u64>().unwrap();
+    
+    seconds + (minutes * 60) + (hours * 60 * 60)
 }

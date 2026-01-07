@@ -2,64 +2,15 @@ use std::{error::Error, io, path::PathBuf};
 
 use walkdir::{DirEntry, WalkDir};
 
-#[derive(Debug, Clone)]
-pub enum VideoStatus {
-    Pending,
-    Processing,
-    Completed,
-    Skipped,
-    Failed,
-}
-
-#[derive(Clone)]
-pub struct VideoFile {
-    path: PathBuf,
-    status: VideoStatus
-}
-
-impl VideoFile {
-    pub fn new(path: PathBuf) -> VideoFile {
-        VideoFile { path, status: VideoStatus::Pending }
-    }
-    
-    pub fn path(&self) -> &PathBuf {
-        &self.path
-    }
-    
-    pub fn status(&self) -> &VideoStatus {
-        &self.status
-    }
-    
-    pub fn set_status(&mut self, status: VideoStatus) {
-        self.status = status;
-    }
-    
-    pub fn size(&self) -> Option<u64> {
-        match self.path.metadata() {
-            Ok(metadata) => Some(metadata.len()),
-            Err(_) => None
-        }
-    }
-    
-    pub fn size_mb(&self) -> Option<u64> {
-        match self.size() {
-            Some(size) => Some(size / 1024 / 1024),
-            None => None
-        }
-    }
-    
-    pub fn is_greater_than(&self, video: &VideoFile) -> bool {
-        self.size() >= video.size()
-    }
-}
+use crate::asset_handler::VideoFile;
 
 pub struct FileScannerConfig<'a> {
     input: PathBuf,
-    white_list: Vec<&'a str>
+    white_list: &'a Vec<&'a str>
 }
 
 impl<'a> FileScannerConfig<'a> {
-    pub fn new(input: PathBuf, white_list: Vec<&'a str>) -> FileScannerConfig<'a> {
+    pub fn new(input: PathBuf, white_list: &'a Vec<&'a str>) -> FileScannerConfig<'a> {
         FileScannerConfig { input, white_list }
     }
 }
@@ -141,6 +92,75 @@ impl<'a> FileScanner<'a> {
             }
         }
         
+        if self.assets.is_empty() {
+            let error = io::Error::new(io::ErrorKind::NotFound, "No valid videos were found");
+            return Err(Box::new(error));
+        }
+        
         Ok(self.assets.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    
+    fn get_white_list() -> Vec<&'static str> {
+        vec!["mp4", "mov", "mkv"]
+    }
+
+    fn create_empty_dir(dir: &str) {
+        fs::create_dir(dir).unwrap_or_else(|_| {delete_dir(dir);})
+    }
+    
+    fn delete_dir(dir: &str) {
+        fs::remove_dir_all(dir).unwrap_or_else(|_| {});
+    }
+    
+    fn create_data_test(files: &Vec<&str>, dir: &str) {
+        for file in files {
+            let file = format!("{}/{}", dir, file);
+            File::create(file).unwrap();
+        }
+    }
+    
+    #[test]
+    fn test_empty_dir() {
+        let dir = "assets";
+        let path = PathBuf::from(dir);
+        let white_list = get_white_list();
+        
+        create_empty_dir(dir);
+        
+        let config = FileScannerConfig::new(path, &white_list);
+        let mut scanner = FileScanner::new(config);
+        
+        if let Err(error) = scanner.scan() {
+            delete_dir(dir);
+            assert!(error.is::<io::Error>());
+            return;
+        }
+        delete_dir(dir);
+        assert!(false);  // It shouldn't reach here
+    }
+
+    #[test]
+    fn test_dir_with_data() {
+        let dir = "assets2";
+        let files = vec!["video1.mp4", "video2.mov", "video3.mkv", "document.txt", "image.png", "script.sh"];
+        let path = PathBuf::from(dir);
+        let white_list = get_white_list();
+        
+        create_empty_dir(dir);
+        create_data_test(&files, &dir);
+        
+        let config = FileScannerConfig::new(path, &white_list);
+        let mut scanner = FileScanner::new(config);
+        
+        let assets = scanner.scan().unwrap();
+        delete_dir(dir);
+        
+        assert_eq!(assets.len(), 3);
     }
 }

@@ -1,95 +1,146 @@
-use std::{error::Error, fs, io, path::PathBuf, process::{Command, ExitStatus, Stdio}};
+use std::{error::Error, io::{self, BufRead, BufReader}, process::{self, Command, Stdio}, thread};
 
-use crate::{Cli, scanner::{VideoFile, VideoStatus}, utils};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use regex::Regex;
 
-fn compress_asset(asset: &mut VideoFile, compressed_file_name: &PathBuf) -> Result<ExitStatus, Box<dyn Error>> {
-    Ok(Command::new("ffmpeg")
-        .arg("-i")
-        .arg(asset.path())
-        .arg("-vcodec")
-        .arg("libx264")
-        .arg("-crf")
-        .arg("23")
-        .arg("-acodec")
-        .arg("aac")
-        .arg("-b:a")
-        .arg("128k")
-        .arg("-map_metadata")
-        .arg("0")
-        .arg(compressed_file_name)
-        .arg("-v")
-        .arg("warning")
-        .arg("-hide_banner")
-        .arg("-stats")
-        .stderr(Stdio::null())
-        .status()?)
-}
+use crate::{AppConfig, asset_handler::{AssetStatus, VideoFile}, errors::CompressionError, utils};
+use crate::asset_handler::MediaAsset;
 
-fn set_creation_date(asset: &VideoFile, time_zone: String) -> Result<ExitStatus, Box<dyn Error>> {
-    let creation_date = format!(r#"-Keys:CreationDate<${{CreateDate;ShiftTime("{}")}}{}"#, time_zone, time_zone);
+pub trait Processor {
+    fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &AppConfig) -> Result<(), Box<dyn Error>>;
     
-    Ok(Command::new("exiftool")
-        .arg(creation_date)
-        .arg("-overwrite_original")
-        .arg(asset.path())
-        .stderr(Stdio::null())
-        .status()?
-    )
+    // TODO: this method should delete any file, instead it should delegate that task
+    // To do so, it should return an enum such as erificationStatus::Success, VerificationStatus::CompressedIsLarger,
+    // or VerificationStatus::FailedToReadMetadata
+    fn verify_compression(&self, original: &mut VideoFile, compressed: &VideoFile, cli: &AppConfig) -> Result<(), CompressionError> {
+        if compressed.is_greater_than(&original) {
+            original.set_status(AssetStatus::Failed);
+            
+            let original_size = original.size_mb()
+                .ok_or(CompressionError::FileSizeError("Error reading original file size".to_string()))?;
+            let compressed_size = compressed.size_mb()
+                .ok_or(CompressionError::FileSizeError("Error reading compressed file size".to_string()))?;
+            
+            if let Err(e) = utils::delete_file(&compressed) {
+                let err_msg = format!("Error deleting {}", &compressed.path().display(), );
+                return Err(CompressionError::IoError(err_msg, e));
+            }
+            
+            let err_msg = format!("Compressed is greater than original. Original: {} MB, compressed: {} MB", original_size, compressed_size);
+            return Err(CompressionError::CompressionFailed(err_msg));
+        } else {
+            if let Err(e) = compressed.set_creation_date() {
+                original.set_status(AssetStatus::PostProcessingFailed);
+                let err_msg = format!("Error setting creation date to {},", &compressed.path().display());
+                return Err(CompressionError::DateError(err_msg, e));
+            }
+            
+            if cli.delete {
+                if let Err(e) = utils::delete_file(original) {
+                    original.set_status(AssetStatus::PostProcessingFailed);
+                    let err_msg = format!("Error deleting {}", &original.path().display());
+                    return Err(CompressionError::IoError(err_msg, e));
+                }
+            }
+            
+            original.set_status(AssetStatus::Completed);
+            
+            Ok(())
+        }
+    }
 }
 
-fn delete_file(asset: &VideoFile) -> Result<(), io::Error> {
-    println!("Deleting {}", asset.path().display());
-    fs::remove_file(asset.path())?;
-    Ok(())
-}
+pub struct VideoProcessor { }
 
-fn verify_successfull_compression(original: &mut VideoFile, compressed_file: PathBuf, cli: &Cli) -> Result<(), String> {
-    let compressed_video = VideoFile::new(compressed_file);
-    if compressed_video.is_greater_than(&original) {
-        original.set_status(VideoStatus::Failed);
-        eprintln!("Compressed is greater than original");
-        let original_size = original.size_mb().ok_or(format!("Error reading {} file size", original.path().display()));
-        let compressed_size = compressed_video.size_mb().ok_or(format!("Error reading {} file size", compressed_video.path().display()));
-        eprintln!("Original: {}, compressed: {}", original_size?, compressed_size?);
-        // TODO: Show error message
-        let _ = delete_file(&compressed_video);
-    } else {
-        // TODO: also show error here and handle the time zone properly
-        let _ = set_creation_date(&compressed_video, String::from("-06:00"));
-        cli.delete.then(|| { delete_file(original) });
+impl VideoProcessor {
+    pub fn new() -> VideoProcessor {
+        VideoProcessor {  }
     }
     
-    Ok(())
+    fn compress(&self, asset: &mut VideoFile, destination_asset: &VideoFile) -> Result<process::Child, io::Error> {
+        Ok(Command::new("ffmpeg")
+            .arg("-i")
+            .arg(asset.path())
+            .arg("-vcodec")
+            .arg("libx264")
+            .arg("-crf")
+            .arg("23")
+            .arg("-acodec")
+            .arg("aac")
+            .arg("-b:a")
+            .arg("128k")
+            .arg("-map_metadata")
+            .arg("0")
+            .arg(destination_asset.path())
+            .arg("-v")
+            .arg("warning")
+            .arg("-hide_banner")
+            .arg("-stats")
+            .stderr(Stdio::piped())
+            .spawn()?)
+    }
 }
 
-pub fn process_asset(asset: &mut VideoFile, cli: &Cli) -> Result<(), Box<dyn Error>> {
-    asset.set_status(VideoStatus::Processing);
-    let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
-    
-    if compressed_file_name.exists() {
-        println!("{} is already compressed", asset.path().display());
-        asset.set_status(VideoStatus::Skipped);
-        return Ok(());
+impl Processor for VideoProcessor {
+    fn process(&self, index: &usize, total: &usize, asset: &mut VideoFile, cli: &AppConfig) -> Result<(), Box<dyn Error>> {
+        asset.set_status(AssetStatus::Processing);
+        
+        let compressed_file_name = utils::get_compressed_file_name(&asset.path())?;
+        let compressed_asset = VideoFile::new(compressed_file_name);
+        
+        if compressed_asset.path().exists() {
+            asset.set_status(AssetStatus::Skipped);
+            return Ok(());
+        }
+        
+        // TODO: Fix strange logic here, only send asset, return a tuble with status and
+        // compressed_asset
+        let mut process = self.compress(asset, &compressed_asset)?;
+        let stderr = process.stderr.take().expect("Failed to capture stderr");
+        
+        let multi_progress_bar = MultiProgress::new();
+        let duration = asset.duration_int().unwrap_or(0);
+        let style = ProgressStyle::default_bar()
+            .template("{msg}\n[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+            .expect("Failed to create progress bar style");
+        let progress_bar = multi_progress_bar.add(ProgressBar::new(duration));
+        progress_bar.set_style(style);
+        progress_bar.set_message(format!("[{}/{}] Compressing - {}", index, total, asset.path().display()));
+        
+        let regex = Regex::new(r"time=(?P<hh>\d{2}):(?P<mm>\d{2}):(?P<ss>\d{2})\.(?P<ms>\d{2})").unwrap();
+        
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut buffer = Vec::new();
+            
+            while let Ok(n) = reader.read_until(b'\r', &mut buffer) {
+                if n == 0 { break; }
+                let line = String::from_utf8_lossy(&buffer);
+                
+                if let Some(caps) = regex.captures(&line) {
+                    progress_bar.set_position(utils::captures_to_seconds(&caps));
+                }
+                
+                buffer.clear();
+            }
+        });
+        
+        if process.wait().unwrap().success() {
+            self.verify_compression(asset, &compressed_asset, cli)?;
+        } else {
+            asset.set_status(AssetStatus::Failed);
+        }
+        
+        Ok(())
     }
-    
-    println!("Compressing {}", asset.path().display());
-    let status = compress_asset(asset, &compressed_file_name);
-    
-    if status?.success() {
-        asset.set_status(VideoStatus::Completed);
-        verify_successfull_compression(asset, compressed_file_name, cli)?;
-    } else {
-        eprintln!("Error compressing {}", asset.path().display());
-        asset.set_status(VideoStatus::Failed);
-    }
-    
-    Ok(())
 }
 
-pub fn process_assets(assets: &mut Vec<VideoFile>, cli: &Cli) -> Result<(), Box<dyn Error>> {
-    for asset in assets {
-        process_asset(asset, cli)?;
+// TODO: move this to lib.rs
+pub fn process_videos<P: Processor>(processor: &P, assets: &mut Vec<VideoFile>, cli: &AppConfig) {
+    let total = assets.len();
+    for (index, asset) in assets.iter_mut().enumerate() {
+        processor.process(&(index + 1), &total, asset, cli).unwrap_or_else(|e| {
+            eprintln!("{}", e);
+        });
     }
-    
-    Ok(())
 }
